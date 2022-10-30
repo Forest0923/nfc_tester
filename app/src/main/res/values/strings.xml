@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">nfc_tester</string>
+    <string name="read">read</string>
 </resources>
