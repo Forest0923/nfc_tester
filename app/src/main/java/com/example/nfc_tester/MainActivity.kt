@@ -24,33 +24,51 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        Log.d(TAG,"onNewIntent")
+        Log.d(TAG,"onNewIntent: Action = ${intent.action}")
+        Log.d(TAG,"onNewIntent: Data = ${intent.dataString}")
+        Log.d(TAG,"onNewIntent: extras = ${intent.extras}")
+        Log.d(TAG,"onNewIntent: ID = ${intent.getByteArrayExtra(NfcAdapter.EXTRA_ID)}")
+        Log.d(TAG,"onNewIntent: Messages = ${intent.getByteArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)}")
 
-        if (intent == null) {
-            return
-        }
+        val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG) ?: return;
 
-        Log.d(TAG,"Action" + intent.action)
+        Log.d(TAG,"onNewIntent: tag = $tag")
+        NfcFReader().read(tag)
+    }
+}
 
-        if(NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.action) || NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.action)) {
+class NfcFReader() {
+    fun read(tag: Tag) {
+        val nfc = NfcF.get(tag)
+        Log.d(TAG,"NfcFReader.read: $nfc")
+        Log.d(TAG,"id from tag: ${tag.id}")
 
-            val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG) ?: return
+        try {
+            nfc.connect()
 
-            val ndef = Ndef.get(tag) ?: return;
+            // systemcode
+            Log.d(TAG,"systemcode: ${nfc.systemCode.iterator()}")
+            for (i in 0 until nfc.systemCode.size)
+                Log.d(TAG,String.format("%02X",nfc.systemCode[i]))
 
-            val raws = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES) ?: return;
+            // manufacturer PMm
+            Log.d(TAG,"manufacturer: ")
+            for (i in 0 until nfc.manufacturer.size)
+                Log.d(TAG,String.format("%02X",nfc.manufacturer[i]))
 
-            var msgs = arrayOfNulls<NdefMessage>(raws.size)
+            Log.d(TAG,"maxTransceiveLength = ${nfc.maxTransceiveLength}")
+            Log.d(TAG,"isConnected = ${nfc.isConnected}")
+            val command = byteArrayOf(0x0a.toByte(), 0x0b.toByte())
+            val msg = byteArrayOf(command.size.toByte(), command[0], command[1])
+            Log.d(TAG,"${msg[0]}, ${msg[1]}, ${msg[2]}")
+            val res = nfc.transceive(msg)
+            Log.d(TAG, "res = $res")
 
-            for(i in raws.indices) {
-                msgs[i] = raws.get(i) as NdefMessage?
-                for(records in msgs) {
-                    for(record in records?.records!!){
-                        Log.d(TAG,"TNF=" + record.tnf)
-                        Log.d(TAG,"mime=" + record.toMimeType())
-                        Log.d(TAG,"payload=" + String(record.payload));
-                    }
-                }
+            nfc.close()
+        } catch (e: Exception) {
+            Log.e(TAG,"NfcFReader: ERROR '$e'")
+            if (nfc.isConnected) {
+                nfc.close()
             }
         }
     }
