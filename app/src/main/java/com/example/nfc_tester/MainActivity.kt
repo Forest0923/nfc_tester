@@ -1,10 +1,14 @@
 package com.example.nfc_tester
 
+import android.app.PendingIntent
 import android.content.ContentValues.TAG
 import android.content.Intent
+import android.content.IntentFilter
 import android.nfc.NfcAdapter
+import android.nfc.NfcAdapter.ReaderCallback
 import android.nfc.Tag
 import android.nfc.tech.NfcF
+import android.os.Build
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
@@ -14,9 +18,26 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
+//    lateinit var mNfcAdapter: NfcAdapter
+//    lateinit var pendingIntent: PendingIntent
+//    lateinit var intentFilterArray: Array<IntentFilter>
+//    lateinit var filter: IntentFilter
+//    lateinit var techLists: Array<Array<String>>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+//        pendingIntent = PendingIntent.getActivity(
+//            this,
+//            0,
+//            Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+//            0
+//        )
+//        filter = IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED)
+//        intentFilterArray = arrayOf(filter)
+//        mNfcAdapter = NfcAdapter.getDefaultAdapter(applicationContext)
+//        techLists = arrayOf(arrayOf("NfcF"))
         findViewById<LinearLayout>(R.id.home).visibility = View.VISIBLE
         findViewById<LinearLayout>(R.id.result).visibility = View.GONE
         findViewById<TextView>(R.id.mem_dump).movementMethod = ScrollingMovementMethod()
@@ -40,11 +61,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume")
+//        mNfcAdapter.enableForegroundDispatch(this, pendingIntent, intentFilterArray, techLists)
     }
 
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause")
+//        mNfcAdapter.disableForegroundDispatch(this)
     }
 
     private fun printByteArray(prefix: String, array: List<Byte>) =
@@ -91,9 +114,7 @@ class NfcFReader(tag: Tag) {
         val timeSlot = byteArrayOf(0x0f)
 
         val command = cmdCode + systemCode + reqCode + timeSlot
-        printByteArray("polling: command\t=", command)
         val msg = byteArrayOf((command.size + 1).toByte()) + command
-        printByteArray("polling: msg\t=", msg)
         return nfc.transceive(msg)
     }
 
@@ -106,9 +127,7 @@ class NfcFReader(tag: Tag) {
         val nodeCodeList = byteArrayOf(serviceCode[1], serviceCode[0])
 
         val command = cmdCode + idm + nodeNum + nodeCodeList
-        printByteArray("requestService: command\t=", command)
         val msg = byteArrayOf((command.size + 1).toByte()) + command
-        printByteArray("requestService: msg\t=", msg)
         return nfc.transceive(msg)
     }
 
@@ -119,9 +138,7 @@ class NfcFReader(tag: Tag) {
         val cmdCode = byteArrayOf(0x04)
 
         val command = cmdCode + idm
-        printByteArray("requestResponse: command\t=", command)
         val msg = byteArrayOf((command.size + 1).toByte()) + command
-        printByteArray("requestResponse: msg\t=", msg)
 
         return nfc.transceive(msg)
     }
@@ -140,15 +157,12 @@ class NfcFReader(tag: Tag) {
             byteArrayOf(serviceCode[1], serviceCode[0])    // 0x000B 0x0009 (2m-byte)
         val blockNum = byteArrayOf(size.toByte()) // (1-byte)
         var blockList = byteArrayOf()     // (N-byte, 2n <= N <= 3n)
-        Log.d(TAG, "size =$size")
         for (i in 0 until size) {
             blockList += byteArrayOf(0x80.toByte(), i.toByte())
         }
 
         val command = cmdCode + idm + serviceNum + serviceCodeList + blockNum + blockList
-        printByteArray("readWithoutEncryption: command\t=", command)
         val msg = byteArrayOf((command.size + 1).toByte()) + command
-        printByteArray("readWithoutEncryption: msg\t=", msg)
 
         return nfc.transceive(msg)
     }
@@ -163,7 +177,6 @@ class NfcFReader(tag: Tag) {
         val command = cmdCode + idm + idx
         val msg = byteArrayOf((command.size + 1).toByte()) + command
 
-        printByteArray("searchServiceCode: msg\t=", msg)
         return nfc.transceive(msg)
     }
 
@@ -188,7 +201,6 @@ class NfcFReader(tag: Tag) {
         try {
             nfcf.nfc.connect()
             res = nfcf.requestSystemCode()!!.drop(10).toByteArray()
-//            printByteArray("requestSystemCode: ", res)
             nfcf.nfc.close()
         } catch (e: Exception) {
             nfcf.nfc.close()
@@ -257,7 +269,6 @@ class NfcFReader(tag: Tag) {
     private fun getMemoryContentOfService(nfcf: NfcFReader, serviceCode: ByteArray): Array<String> {
         var ret = emptyArray<String>()
         var size = 1
-        Log.d(TAG, "getMemoryContentOfService")
         while (true) {
             val res = nfcf.readWithoutEncryption(
                 byteArrayOf(
@@ -266,27 +277,21 @@ class NfcFReader(tag: Tag) {
                 ), size
             ) ?: return arrayOf("ERROR: readWithoutEncryption")
 
-            Log.d(TAG, "%02X".format(res[11]))
-
             when (res[11]) {
                 0x00.toByte() -> {
                     // Success
-                    Log.d(TAG, "success")
                     ret = parseBlockData(res[12].toInt(), res.drop(13).toByteArray())
                     size++
                     continue
                 }
                 0xA5.toByte() -> {
-                    Log.d(TAG, "access not allowed")
                     return arrayOf("   Access not allowed")
                 }
                 0xA8.toByte() -> {
                     // Illegal block number
-                    Log.d(TAG, "illegal block")
                     return ret
                 }
                 else -> {
-                    Log.d(TAG, "other error")
                     return ret
                 }
             }
@@ -331,8 +336,6 @@ class NfcFReader(tag: Tag) {
                     else -> continue
                 }
 
-                Log.d(TAG, "0x%02X(%d), 0x%02X, 0x%02X".format(i, i, i shr 8, i and 0xff))
-                printByteArray("searchServiceCode: res\t=", resSearchServiceCode)
             }
             nfcf.nfc.close()
         } catch (e: Exception) {
