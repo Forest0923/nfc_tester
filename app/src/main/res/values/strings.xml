@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">nfc_tester</string>
     <string name="read">read</string>
+    <string name="start_message">Please pass the NFC tag over the reader</string>
+    <string name="tag_info_header">Tag information</string>
+    <string name="mem_dump">Memory dump</string>
 </resources>
