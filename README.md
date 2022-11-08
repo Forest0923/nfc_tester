@@ -20,7 +20,3 @@ The following documents, tech notes, and applications were very helpful in the d
 - [[PASMO] FeliCa から情報を吸い出してみる - FeliCaの仕様編 [Android][Kotlin]](https://qiita.com/YasuakiNakazawa/items/3109df682af2a7032f8d)
 - [AndroidでFelica(NFC)のブロックデータの取得](https://qiita.com/nshiba/items/38f94d61c020a17314b6)
 
-## Known Issues
-
-- I intended to read NFC only with the main activity, but `PendingIntent` throws an error on Android 12, so it's not currently realized.
-- The application crashes when reading NFC except NfcF.
