@@ -1,11 +1,9 @@
 package com.example.nfc_tester
 
-import android.app.PendingIntent
 import android.content.ContentValues.TAG
 import android.content.Intent
-import android.content.IntentFilter
 import android.nfc.NfcAdapter
-import android.nfc.NfcAdapter.ReaderCallback
+import android.nfc.NfcAdapter.*
 import android.nfc.Tag
 import android.nfc.tech.NfcF
 import android.os.Build
@@ -15,29 +13,19 @@ import android.util.Log
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
-//    lateinit var mNfcAdapter: NfcAdapter
-//    lateinit var pendingIntent: PendingIntent
-//    lateinit var intentFilterArray: Array<IntentFilter>
-//    lateinit var filter: IntentFilter
-//    lateinit var techLists: Array<Array<String>>
+    private lateinit var mNfcAdapter: NfcAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-//        pendingIntent = PendingIntent.getActivity(
-//            this,
-//            0,
-//            Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-//            0
-//        )
-//        filter = IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED)
-//        intentFilterArray = arrayOf(filter)
-//        mNfcAdapter = NfcAdapter.getDefaultAdapter(applicationContext)
-//        techLists = arrayOf(arrayOf("NfcF"))
+        mNfcAdapter = getDefaultAdapter(applicationContext)
+
         findViewById<LinearLayout>(R.id.home).visibility = View.VISIBLE
         findViewById<LinearLayout>(R.id.result).visibility = View.GONE
         findViewById<TextView>(R.id.mem_dump).movementMethod = ScrollingMovementMethod()
@@ -45,8 +33,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        Log.d(TAG, "onNewIntent")
 
-        val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG) ?: return
+        val tag = intent.getParcelableExtra<Tag>(EXTRA_TAG) ?: return
         Log.d(TAG, tag.toString())
         val nfcf = NfcFReader(tag)
         val tagInfo = nfcf.getTagInfo(tag)
@@ -58,26 +47,43 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.mem_dump).text = memInfo.joinToString(separator = "\n")
     }
 
+    @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume")
-//        mNfcAdapter.enableForegroundDispatch(this, pendingIntent, intentFilterArray, techLists)
+        mNfcAdapter.enableReaderMode(
+            this,
+            MyReaderCallback(this),
+            FLAG_READER_NFC_F or FLAG_READER_SKIP_NDEF_CHECK,
+            null
+        )
     }
 
+    @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause")
-//        mNfcAdapter.disableForegroundDispatch(this)
+        mNfcAdapter.disableReaderMode(this)
     }
 
-    private fun printByteArray(prefix: String, array: List<Byte>) =
-        printByteArray(prefix, array.toByteArray())
+    @RequiresApi(Build.VERSION_CODES.KITKAT)
+    class MyReaderCallback(private val activity: MainActivity) : ReaderCallback {
+        override fun onTagDiscovered(tag: Tag) {
+            Log.d(TAG, "onTagDiscovered: $tag")
 
-    private fun printByteArray(prefix: String, array: ByteArray) {
-        Log.d(
-            TAG,
-            "$prefix ${array.joinToString(separator = ":") { eachByte -> "%02X".format(eachByte) }}"
-        )
+            val nfcf = NfcFReader(tag)
+            val tagInfo = nfcf.getTagInfo(tag)
+            val memInfo = nfcf.getMemoryContent(tag)
+
+            activity.runOnUiThread {
+                activity.findViewById<LinearLayout>(R.id.home)?.visibility = View.GONE
+                activity.findViewById<LinearLayout>(R.id.result)?.visibility = View.VISIBLE
+                activity.findViewById<TextView>(R.id.tag_info)?.text =
+                    tagInfo.joinToString(separator = "\n")
+                activity.findViewById<TextView>(R.id.mem_dump)?.text =
+                    memInfo.joinToString(separator = "\n")
+            }
+        }
     }
 }
 
